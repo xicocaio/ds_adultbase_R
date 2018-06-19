@@ -1,0 +1,146 @@
+---
+title: "Activity 3 - Bayesian Network 2"
+output:
+  html_notebook: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+###  Francisco Caio Lima Paiva - 5992344
+**A)** Load adult and adult.text datasets with NA removed
+```{r echo=FALSE}
+library(bnlearn)
+library(caret)
+df = na.omit(read.csv("~/Documents/Poli/Mestrado/PCS5024-statML/adultbase/adult.data", na.strings="?", strip.white = TRUE))
+df.test = na.omit(read.csv("~/Documents/Poli/Mestrado/PCS5024-statML/adultbase/adult.test", na.strings="?", strip.white = TRUE))
+cat("adult train set dimensions: ", dim(df))
+cat("\nadult test set dimensions: ", dim(df.test))
+```
+
+**B)** Choosed 5 features considered most important and reduced number of possible values for each feature to a factor of two
+```{r echo=FALSE}
+keeps = c("gross.income", "education.num", "marital.status", "sex", "age")
+df_redux = df[keeps]
+df_redux.test = df.test[keeps]
+
+df_redux$marital.status = ifelse(df_redux$marital.status == "Married-civ-spouse","married", "not-married")
+df_redux$education.num = ifelse(df_redux$education.num < 11, "below-bachelor", "equal-above-bachelor")
+df_redux$age = ifelse(df_redux$age < 35 | df_redux$age > 64, "young-old", "prime-age")
+
+df_redux.test$marital.status = ifelse(df_redux.test$marital.status == "Married-civ-spouse","married", "not-married")
+df_redux.test$education.num = ifelse(df_redux.test$education.num < 11, "below-bachelor", "equal-above-bachelor")
+df_redux.test$age = ifelse(df_redux.test$age < 35 | df_redux.test$age > 64, "young-old", "prime-age")
+
+df_redux[] = lapply(df_redux, factor)
+df_redux.test[] = lapply(df_redux.test, factor)
+```
+
+**C)** The following approaches to performing predictions were performed:
+
+**1.**  Manually ajusted bayesian network structure and parameters.
+
+**1.1.**  Bayesian Network manually designed:
+```{r echo = FALSE}
+arc.set=matrix(c("age", "gross.income", "education.num","gross.income","marital.status","gross.income","sex", "marital.status"),
+               ncol=2,byrow=TRUE,
+               dimnames=list(NULL,c("from","to")))
+
+graph = empty.graph(keeps)
+
+arcs(graph)=arc.set
+plot(graph)
+```
+
+**1.2.**  Manually adjusting the parameters for the conditional probability tables (cpts). Ex:
+```{r echo=FALSE}
+
+
+cpt.gross_income = c(0.6, 0.4, 0.3, 0.7, 0.95, 0.05, 0.75, 0.25, 0.8, 0.2, 0.45, 0.55, 0.95, 0.05, 0.9, 0.1)
+dim(cpt.gross_income) = c(2,2,2,2)
+dimnames(cpt.gross_income) = list("gross.income" = c("<=50K", ">50K"), "education.num" = c("below-bachelor", "equal-above-bachelor"), "marital.status" = c("married", "not-married"), "age" = c("prime-age", "young-old"))
+
+cpt.education_num = matrix(c(0.7, 0.3), ncol = 2, dimnames = list(NULL, c("below-bachelor", "equal-above-bachelor")))
+
+cpt.marital_status = c(0.2, 0.8, 0.6, 0.4)
+dim(cpt.marital_status) = c(2,2)
+dimnames(cpt.marital_status) = list( "marital.status" = c("married", "not-married"), "sex" = c("Female", "Male"))
+
+cpt.sex = matrix(c(0.3, 0.7), ncol = 2, dimnames = list(NULL, c("Female", "Male")))
+
+cpt.age = matrix(c(0.6, 0.4), ncol = 2, dimnames = list(NULL, c("prime-age", "young-old")))
+
+fitted = custom.fit(graph, dist = list(gross.income = cpt.gross_income, education.num= cpt.education_num, marital.status = cpt.marital_status, sex = cpt.sex, age = cpt.age))
+
+print(fitted$marital.status)
+```
+
+**1.3.**  Finally attained the score below:
+```{r echo=FALSE}
+pred = predict(fitted, node="gross.income", data=df_redux.test, method = "bayes-lw", prob = TRUE)
+xtab = table(pred, df_redux.test[, "gross.income"])
+confmatman = confusionMatrix(xtab, positive = '>50K')
+print(confmatman$table)
+print(confmatman$overall['Accuracy'])
+```
+
+**2.**  Manually ajusted bayesian network structure and automatically obtained parameters.
+
+**2.1.**  Using previous bayesian network, learned the parameters and obtained the conditional probability tables (cpts). Ex:
+```{r echo=FALSE}
+fitted = bn.fit(graph, data = df_redux)
+print(fitted$marital.status)
+```
+
+**2.2.**  Finally, attained the score below:
+```{r echo=FALSE}
+pred = predict(fitted, node="gross.income", data=df_redux.test, method = "bayes-lw", prob = TRUE)
+xtab = table(pred, df_redux.test[, "gross.income"])
+confmatpartman = confusionMatrix(xtab, positive = '>50K')
+print(confmatpartman$table)
+print(confmatpartman$overall['Accuracy'])
+```
+
+**3.**  Automatically ajusted bayesian network structure and parameters.
+
+**3.1.**  Learned the following structure using max-min hill climbing algorithm
+```{r echo = FALSE}
+res = hc(df_redux)
+plot(res)
+```
+
+**3.2.**  Score below:
+```{r echo=FALSE}
+fitted = bn.fit(res, data = df_redux)
+pred = predict(fitted, node="gross.income", data=df_redux.test, method = "bayes-lw", prob = TRUE)
+xtab = table(pred, df_redux.test[, "gross.income"])
+confmatauto = confusionMatrix(xtab, positive = '>50K')
+print(confmatauto$table)
+print(confmatauto$overall['Accuracy'])
+```
+
+**4.**  Naive Bayes
+
+**4.1.**  Structure:
+```{r echo = FALSE}
+bn = naive.bayes(df_redux, "gross.income")
+plot(bn)
+```
+
+**4.2.**  Score below:
+```{r echo = FALSE}
+fitted = bn.fit(bn, data = df_redux)
+pred = predict(fitted, df_redux.test)
+xtab = table(pred, df_redux.test[, "gross.income"])
+confmatnb = confusionMatrix(xtab, positive = '>50K')
+print(confmatnb$table)
+print(confmatnb$overall['Accuracy'])
+```
+
+**D)** Final results are that approach 2 had marginally better accuracy than 1 and 3. Naive Bayes had the worst accuracy.
+```{r echo= FALSE}
+cat("Accuracy")
+cat("\n Approach 1 - structure and cpts manual:", confmatman$overall['Accuracy'])
+cat("\n Approach 2 - structure manual and cpts auto:", confmatpartman$overall['Accuracy'])
+cat("\n Approach 3 - structure and cpts auto:", confmatauto$overall['Accuracy'])
+cat("\n Approach 4 - naive bayes:", confmatnb$overall['Accuracy'])
+```

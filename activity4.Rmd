@@ -1,0 +1,85 @@
+---
+title: "Activity 4 - Adult Base Logistic regression, Decision Tree"
+output:
+  html_notebook: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+###  Francisco Caio Lima Paiva - 5992344
+**A)** Load adult and adult.text datasets with NA removed
+```{r echo=FALSE}
+library(bnlearn)
+library(caret)
+df = na.omit(read.csv("~/Documents/Poli/Mestrado/PCS5024-statML/adultbase/adult.data", na.strings="?", strip.white = TRUE))
+df.test = na.omit(read.csv("~/Documents/Poli/Mestrado/PCS5024-statML/adultbase/adult.test", na.strings="?", strip.white = TRUE))
+
+set.seed(42)
+
+cat("adult data set dimensions: ", dim(df))
+```
+
+**B)** Discard features considered not useful like education (that is redundant to education num), capital gain and capital loss
+```{r echo=FALSE}
+keeps = c("gross.income", "education.num", "marital.status", "sex", "age")
+df_redux = df[keeps]
+df_redux.test = df.test[keeps]
+
+df_redux$marital.status = ifelse(df_redux$marital.status == "Married-civ-spouse","married", "not-married")
+df_redux$education.num = ifelse(df_redux$education.num < 11, "below-bachelor", "equal-above-bachelor")
+df_redux$age = ifelse(df_redux$age < 35 | df_redux$age > 64, "young-old", "prime-age")
+
+df_redux.test$marital.status = ifelse(df_redux.test$marital.status == "Married-civ-spouse","married", "not-married")
+df_redux.test$education.num = ifelse(df_redux.test$education.num < 11, "below-bachelor", "equal-above-bachelor")
+df_redux.test$age = ifelse(df_redux.test$age < 35 | df_redux.test$age > 64, "young-old", "prime-age")
+
+df_redux[] = lapply(df_redux, factor)
+df_redux.test[] = lapply(df_redux.test, factor)
+```
+
+**C)** Run 10-fold cross-validation on logistic regression model
+```{r echo=FALSE}
+
+glm <- train(
+ gross.income ~ .,
+ data = df_redux,
+ method = "glm",
+ trControl = trainControl(
+   method = "cv", number = 10,
+   verboseIter = FALSE
+ )
+)
+
+print(glm)
+```
+
+**D)** Run 10-fold cross-validation on decision tree model
+```{r echo=FALSE}
+
+rpart <- train(
+ gross.income ~ .,
+ data = df_redux,
+ method = "rpart",
+ trControl = trainControl(
+   method = "cv", number = 10,
+   verboseIter = FALSE
+ ),
+ tuneGrid=data.frame(cp=0.005)
+)
+
+print(rpart)
+```
+
+**E)** Run paired t-test for the two classfiers
+```{r echo=FALSE}
+
+predict.glm <- predict(glm, df_redux)
+confmatrix.glm <- confusionMatrix(predict.glm, df_redux$gross.income)
+predict.rpart <- predict(rpart, df_redux)
+confmatrix.rpart <- confusionMatrix(predict.rpart, df_redux$gross.income)
+observations <- resamples(list(LRM=glm, DT=rpart))
+
+final.test <- t.test(observations$values$`LRM~Accuracy`, observations$values$`DT~Accuracy`, paired=TRUE, alternative = "less")
+final.test
+
+```

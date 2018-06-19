@@ -1,0 +1,42 @@
+---
+title: "Bayesian Network 1 - Francisco Caio Lima Paiva - 5992344"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+1 - Load adult csv
+```{r include=FALSE}
+adult = read.csv("~/Documents/Poli/Mestrado/PCS5024-statML/adultbase/adult.data", na.strings=" ?")
+```
+
+2 - Exclude continuous values features and maintain guessed most important 5 features; and remove NA
+```{r}
+adult_discrete = adult[, !sapply(adult, is.numeric)]
+keeps = c("gross.income", "education", "occupation", "sex", "race")
+adult_discrete = adult_discrete[keeps]
+adult_discrete_clean = na.omit(adult_discrete)
+```
+
+```{r include = FALSE}
+View(adult_discrete_clean)
+```
+
+3- Learn structure using max-min hill climbing algorithm
+```{r}
+library(bnlearn)
+bn_df = data.frame(adult_discrete_clean)
+res = hc(bn_df)
+plot(res)
+```
+4 - Bayesian Network Manually Adjusted
+```{r echo=FALSE}
+arc.set=matrix(c("race", "education", "race", "gross.income", "education","occupation","occupation","gross.income","sex", "gross.income"),
+               ncol=2,byrow=TRUE,
+               dimnames=list(NULL,c("from","to")))
+
+graph = empty.graph(keeps)
+
+arcs(graph)=arc.set
+
+plot(graph)
+```

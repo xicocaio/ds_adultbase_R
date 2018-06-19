@@ -1,0 +1,111 @@
+---
+title: "Activity 5 - Adult Base clustering, K-means"
+output: html_notebook
+---
+###  Francisco Caio Lima Paiva - 5992344
+<!-- https://stats.stackexchange.com/questions/146627/chosing-optimal-k-and-optimal-distance-metric-for-k-means -->
+```{r include=FALSE}
+
+library(dplyr) # for data cleaning
+library(cluster) # for gower similarity and pam
+library(Rtsne) # for t-SNE plot
+library(ggplot2) # for visualization
+library(knitr)
+
+set.seed(42) # for reproducibility
+
+```
+
+
+**A)** Load adult dataset
+```{r echo=FALSE}
+
+# maybe dont remove the NAs
+df = read.csv("~/Documents/Poli/Mestrado/PCS5024-statML/adultbase/adult.data", na.strings="?", strip.white = TRUE)
+
+cat("adult data set dimensions: ", dim(df))
+```
+
+**B)** Generate SAdult dataset by keeping only features: age, fnlwgt, education-num, marital-status, sex, hours-per-week. And keeping only 600 first rows.
+```{r echo=FALSE}
+keeps = c("age", "fnlwgt", "education.num", "marital.status", "sex", "hours.per.week")
+
+# use only the first 600 rows
+df_redux = df[1:600,]
+
+df_redux = df_redux[keeps]
+
+cat("SAdult dimensions: ", dim(df_redux))
+```
+
+**C)** Apply z-score to continuous features: age, fnlwgt, education-num, hours-per-week
+```{r echo=FALSE}
+
+numeric_cols = sapply(df_redux, is.numeric)
+
+df_z_score = df_redux
+
+df_z_score[numeric_cols] = lapply(df_redux[numeric_cols], scale)
+#df_redux[numeric_cols] = lapply(df_redux[numeric_cols], function(x){(x-min(x))/(max(x)-min(x))})
+
+head(df_z_score, 5)
+
+```
+
+**D)** We define a-dist as the function that computes the distances of instances of the dataset. In this function the total distance between two intances (d_ij) is calculated by adding the individual positive distances for each feature (d_ijk), and dividing it by the number of features (k). For this to work, the distance for numeric features is d_ijk = |x_ik - x_jk|, where i and j are the number of the lines being compared, and k is the number of the feature being compared. For the distance in categorical features, d_ijk = 1 if the values in lines i,j are equal for feature k, and d_ijk = 0 otherwise.
+
+Finally, **a_dist(i,j) =  sum(d_ijk) / k**
+
+with i,j <= N, where N is the number of lines on the dataset, and k <= M, where M is the number of features in the dataset.
+
+**E)** By using the a_dist function the following distance matrix for the 10 initial instances can be displayed:
+```{r echo=FALSE}
+
+gower_dist <- daisy(df_redux,
+                    metric = "gower")
+
+gower_mat <- as.matrix(gower_dist)
+
+#print(gower_dist)
+#print(gower_mat)
+
+format(round(gower_mat[1:10,1:10],3))
+
+```
+
+**F)** Clusters sizes
+```{r echo=FALSE}
+
+# Calculate silhouette width for many k using PAM
+
+number_of_clusters = c(2,4,6)
+
+pam_fit = lapply(number_of_clusters, function(x){pam(gower_dist, diss = TRUE,k = x)})
+
+cluster_size = lapply(1:3, function(x){as.data.frame(pam_fit[[x]]$clusinfo)$size})
+
+cat("K = 2 => ")
+cat(cluster_size[[1]], sep = ",")
+cat("\nK = 4 => ")
+cat(cluster_size[[2]], sep = ",")
+cat("\nK = 6 => ")
+cat(cluster_size[[3]], sep = ",")
+
+```
+
+
+**G)** Silhouette Coefficient
+```{r echo=FALSE}
+
+# Plot sihouette width (higher is better)
+
+sil_width = lapply(1:3, function(x){pam_fit[[x]]$silinfo$avg.width})
+
+plot(number_of_clusters, sil_width,
+     xlab = "# of Clusters",
+     ylab = "Silhouette Coefficient")
+lines(number_of_clusters, sil_width)
+
+```
+
+**H)** The Silhouette Coefficient is a indicator of separation of cluster and so, higher values show that the instances are well separated within its cluster boundaries. For this reason, the line on the graph increasing as the number of clusters is raised, indicates that it is better to use a higher number of clusters.

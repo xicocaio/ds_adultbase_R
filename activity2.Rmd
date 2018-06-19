@@ -1,0 +1,51 @@
+---
+title: "Activity 2 - Naive Bayes on UCI SPAMBASE"
+output:
+  html_notebook: default
+  pdf_document: default
+---
+###  Francisco Caio Lima Paiva - 5992344
+
+1- Load UCI spambase; load averages from spambase.documentation
+```{r echo = FALSE}
+library(knitr)
+
+df <- read.csv("~/Documents/Poli/Mestrado/PCS5024-statML/spambase/spambase.data", header=TRUE)
+average_vector = c(0.10455,0.21301,0.28066,0.065425,0.31222,0.095901,0.11421,0.10529,0.090067,0.23941,0.059824,0.5417,0.09393,0.058626,0.049205,0.24885,0.14259,0.18474,1.6621,0.085577,0.80976,0.1212,0.10165,0.094269,0.5495,0.26538,0.7673,0.12484,0.098915,0.10285,0.064753,0.047048,0.097229,0.047835,0.10541,0.097477,0.13695,0.013201,0.078629,0.064834,0.043667,0.13234,0.046099,0.079196,0.30122,0.17982,0.0054445,0.031869,0.038575,0.13903,0.016976,0.26907,0.075811,0.044238,5.1915,52.173,283.29,0.39404)
+```
+
+2- Doing discretization of features by turning all values above the average(for that feature) to 1s, and all equal or below to 0s. The email attribute is changed to 'spam' if value is '1', or 'ham'if value is '0'. Also, all dataset values are turned into factors (bnlearn package will only accept values as factors). Sample overview of data:
+```{r echo = FALSE}
+df[, -58] = 1*(df[, -58] > average_vector)
+df[, 58] = factor(df[,58], labels=c("ham", "spam"))
+df[] = lapply(df, factor)
+kable(df[c(1,327,578,2000),c(5,20,57,58)], row.names = FALSE, align = "l")
+```
+
+```{r include = FALSE}
+library(bnlearn)
+library(caret)
+```
+
+3- Randomly split dataset so that 60% (2760 values) is used for training and 40% (1840 values) for testing
+```{r include = FALSE}
+
+smp_size <- floor(0.6 * nrow(df))
+train_ind <- sample(seq_len(nrow(df)), size = smp_size)
+
+train <- df[train_ind, ]
+test <- df[-train_ind, ]
+```
+
+4- Train a model using naive bayes and the train dataset, and perform predictions using the test dataset
+```{r echo = FALSE}
+bn = naive.bayes(train, "email")
+fitted = bn.fit(bn, train)
+pred = predict(fitted, test)
+xtab = table(pred, test[, "email"])
+```
+
+5- Final results below, which gives a empirical error of: 0.1092
+```{r echo = FALSE}
+confusionMatrix(xtab, positive = "spam")
+```
