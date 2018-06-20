@@ -6,7 +6,7 @@ output:
 ---
 1 - Load adult csv
 ```{r include=FALSE}
-adult = read.csv("~/Documents/Poli/Mestrado/PCS5024-statML/adultbase/adult.data", na.strings=" ?")
+adult = read.csv("adultbase/adult.data", na.strings=" ?")
 ```
 
 2 - Exclude continuous values features and maintain guessed most important 5 features; and remove NA
